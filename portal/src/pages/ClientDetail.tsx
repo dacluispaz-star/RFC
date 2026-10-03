@@ -366,7 +366,10 @@ function NutritionTab({ client, now }: { client: Client; now: Date }) {
         <StatTile label="Días registrados · 14" value={`${adh.logged}/14`} />
         <StatTile label="Días en objetivo (±10 %)" value={target ? `${adh.onTarget}` : '—'} hint={target && adh.logged ? `${Math.round((adh.onTarget / adh.logged) * 100)} % de los días registrados` : undefined} />
       </div>
-      <Card title="Calorías por día" subtitle={plan ? `Plan asignado: ${plan.name}` : 'Sin plan asignado'}>
+      <Card
+        title="Calorías por día"
+        subtitle={plan ? <>Plan asignado: <a href={hrefFor({ name: 'plan', id: plan.id })} className="text-accent-strong underline">{plan.name}</a></> : 'Sin plan asignado (se asigna desde la app)'}
+      >
         {adh.logged === 0 ? (
           <EmptyState title="Sin comidas registradas en los últimos 14 días" />
         ) : (

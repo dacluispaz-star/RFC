@@ -2,7 +2,8 @@
 
 Portal de escritorio para ver, crear y editar clientes y revisar su analítica:
 composición corporal, actividad y adherencia, nutrición y vencimientos del
-servicio. No incluye funciones de entrenamiento.
+servicio. Además permite crear y editar **planes de alimentación** y descargar
+su PDF con el mismo diseño que la app. No incluye funciones de entrenamiento.
 
 Usa **la misma cuenta de Supabase que la app**: lee la copia en la nube
 (`user_backups`) que sube el teléfono y guarda tus cambios en una cola
@@ -16,8 +17,10 @@ En Supabase → **SQL Editor**, ejecuta en este orden:
 
 1. `supabase/migrations/20260930120000-body-composition.sql` (si aún no lo hiciste)
 2. `supabase/migrations/20261003120000-portal-changes.sql`
+3. `supabase/migrations/20261004120000-portal-meal-plans.sql` (planes y marca del PDF)
 
-Sin el segundo script el portal funciona, pero solo en lectura.
+Sin el segundo script el portal funciona, pero solo en lectura. Sin el tercero
+no se pueden guardar planes y el logo/contacto del PDF solo queda en ese navegador.
 
 Instala también la nueva versión de la app en el teléfono: es la que sabe
 aplicar los cambios del portal.
@@ -41,7 +44,7 @@ memoria.
 
 1. Sube el repositorio a GitHub (si no lo está).
 2. En Vercel → **Add New Project** → importa el repo.
-3. **Root Directory:** `portal`. Vercel detecta Vite solo. En *Install Command* pon `npm install --legacy-peer-deps`.
+3. **Root Directory:** `portal`. Vercel detecta Vite solo; el comando de instalación ya viene en `vercel.json`.
 4. **Environment Variables:** `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 5. Deploy.
 
@@ -49,6 +52,17 @@ En Netlify funciona igual: Base directory `portal` (ya hay un `netlify.toml`).
 
 Recomendado: en Supabase → Authentication → URL Configuration, añade la URL del
 portal a *Redirect URLs*.
+
+## Planes de alimentación
+
+- **Planes** → *Nuevo plan*: eliges días; cada día empieza con Desayuno,
+  Merienda, Almuerzo, Snack y Cena (como en la app).
+- En el editor añades alimentos de la misma base que la app (con porciones),
+  cambias gramos, renombras/añades comidas, añades días o copias un día a otros.
+- **PDF**: eliges el cliente que aparece y se descarga con el mismo diseño de la
+  app; después lo adjuntas en WhatsApp Web o en el correo.
+- **Ajustes** → logo y datos de contacto que salen en el PDF del portal.
+- La asignación de un plan a un cliente se sigue haciendo desde la app.
 
 ## Cómo se sincroniza
 

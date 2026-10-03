@@ -4,18 +4,20 @@ import { useTheme } from '@/lib/theme';
 import { hrefFor, type Route } from '@/lib/router';
 import { fmtDateTime } from '@/lib/format';
 import { cx } from './ui';
-import { IconCloud, IconGrid, IconLogout, IconMenu, IconMoon, IconRefresh, IconSun, IconUsers, IconX } from './icons';
+import { IconCloud, IconGrid, IconLogout, IconMeal, IconMenu, IconMoon, IconRefresh, IconSettings, IconSun, IconUsers, IconX } from './icons';
 
 const NAV = [
   { route: { name: 'dashboard' } as Route, label: 'Panel', Icon: IconGrid },
   { route: { name: 'clients' } as Route, label: 'Clientes', Icon: IconUsers },
+  { route: { name: 'plans' } as Route, label: 'Planes', Icon: IconMeal },
+  { route: { name: 'settings' } as Route, label: 'Ajustes', Icon: IconSettings },
 ];
 
 export function Layout({ route, children }: { route: Route; children: ReactNode }) {
   const { mode, session, data, loading, reload, signOut } = useData();
   const { theme, toggle } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const section = route.name === 'client' ? 'clients' : route.name;
+  const section = route.name === 'client' ? 'clients' : route.name === 'plan' ? 'plans' : route.name;
 
   const sidebar = (
     <div className="flex flex-col h-full">

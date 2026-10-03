@@ -3,6 +3,40 @@
 
 import type { BackupPayload, Client, FoodEntry, Measurement, PersonalRecord, ServicePeriod, SessionSummary } from './types';
 import { toISODate, DAY_MS } from './analytics';
+import { makeItem, type FoodLike } from './mealPlans';
+import type { MealPlan } from './types';
+
+const FOODS: Record<string, FoodLike> = {
+  huevo: { id: 'huevo-de-gallina-entero', name: 'Huevo de gallina entero', calories: 149, protein: 12.5, carbs: 0.3, fat: 10.8 },
+  banano: { id: 'banano', name: 'Banano', calories: 101, protein: 1.5, carbs: 22.3, fat: 0.1 },
+  yogur: { id: 'yogurt-griego-0-grasa', name: 'Yogurt griego 0% grasa', calories: 59, protein: 10, carbs: 3.6, fat: 0.4 },
+  almendras: { id: 'almendras', name: 'Almendras', calories: 639, protein: 18.6, carbs: 13.9, fat: 54.1 },
+  pollo: { id: 'pollo-a-la-plancha', name: 'Pollo a la plancha', calories: 175, protein: 28, carbs: 1, fat: 6 },
+  arroz: { id: 'arroz-blanco', name: 'Arroz blanco', calories: 170, protein: 3, carbs: 36, fat: 0.5 },
+  brocoli: { id: 'brocoli', name: 'Brócoli', calories: 46, protein: 3, carbs: 6.6, fat: 0.3 },
+  salmon: { id: 'salmon-filete', name: 'Salmón filete', calories: 181, protein: 20.2, carbs: 0.3, fat: 11 },
+  aguacate: { id: 'aguacate', name: 'Aguacate', calories: 221, protein: 1.3, carbs: 13.5, fat: 16.4 },
+  manzana: { id: 'manzana', name: 'Manzana', calories: 72, protein: 0.3, carbs: 16.5, fat: 0.2 },
+};
+
+function demoPlan(id: string, name: string, days: string[], scale: number): MealPlan {
+  let n = 0;
+  const it = (k: keyof typeof FOODS, g: number) => makeItem(FOODS[k], Math.round(g * scale), `${id}-i${n++}`);
+  return {
+    id,
+    name,
+    days: days.map((d, i) => ({
+      name: d,
+      meals: [
+        { name: 'Desayuno', items: [it('huevo', 110), it('banano', 120)] },
+        { name: 'Merienda', items: [it('yogur', 150), it('almendras', 20)] },
+        { name: 'Almuerzo', items: i % 2 === 0 ? [it('pollo', 150), it('arroz', 150), it('brocoli', 100)] : [it('salmon', 150), it('arroz', 120), it('aguacate', 50)] },
+        { name: 'Snack', items: [it('manzana', 180)] },
+        { name: 'Cena', items: i % 2 === 0 ? [it('salmon', 120), it('brocoli', 150)] : [it('pollo', 130), it('aguacate', 50)] },
+      ],
+    })),
+  };
+}
 
 function rng(seed: number) {
   let s = seed >>> 0;
@@ -180,7 +214,15 @@ export function demoPayload(now: Date = new Date()): BackupPayload {
     clients,
     measurements: measurements.reverse(),
     sessions: sessions.sort((a, b) => b.date.localeCompare(a.date)),
-    nutrition: { entries, targetsByClient, mealPlans: [{ id: 'plan-1', name: 'Definición · Fase 1', days: [] }], assignedPlanIds: { 'demo-1': 'plan-1', 'demo-2': 'plan-1' } },
+    nutrition: {
+      entries,
+      targetsByClient,
+      mealPlans: [
+        demoPlan('plan-1', 'Definición · Fase 1', ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'], 1),
+        demoPlan('plan-2', 'Volumen limpio', ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], 1.35),
+      ],
+      assignedPlanIds: { 'demo-1': 'plan-1', 'demo-2': 'plan-1', 'demo-4': 'plan-2' },
+    },
     checkins: [],
     prs,
     periods,

@@ -7,7 +7,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, isConfigured } from './supabase';
 import { buildPortalData } from './overlay';
 import { demoPayload } from './demo';
-import type { BackupPayload, Client, Measurement, PortalChange, PortalData } from './types';
+import type { BackupPayload, Branding, Client, MealPlan, Measurement, PortalChange, PortalData } from './types';
 
 export type Mode = 'live' | 'demo';
 
@@ -23,6 +23,12 @@ interface DataApi {
   saveClient: (input: Partial<Client> & { full_name: string }, previous?: Client | null) => Promise<string>;
   saveMeasurement: (input: Partial<Measurement> & { client_id: string; measured_at: string }, previous?: Measurement | null) => Promise<string>;
   deleteMeasurement: (id: string) => Promise<void>;
+  /** Crea o reemplaza un plan de alimentación completo. Devuelve su id. */
+  saveMealPlan: (plan: Omit<MealPlan, 'id'> & { id?: string }) => Promise<string>;
+  deleteMealPlan: (id: string) => Promise<void>;
+  /** Logo y contacto del PDF. */
+  branding: Branding;
+  saveBranding: (b: Branding) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   enterDemo: () => void;
@@ -62,6 +68,31 @@ export function diffRecord<T extends object>(next: Partial<T>, prev?: Partial<T>
 }
 
 const DEMO_KEY = 'rfc-portal-demo';
+const BRANDING_KEY = 'rfc-portal-branding';
+const EMPTY_BRANDING: Branding = { logoUrl: null, contactInfo: '' };
+
+function normBranding(v: unknown): Branding {
+  const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  return {
+    logoUrl: typeof o.logoUrl === 'string' && o.logoUrl.startsWith('data:image/') ? o.logoUrl : null,
+    contactInfo: typeof o.contactInfo === 'string' ? o.contactInfo : '',
+  };
+}
+
+function readCachedBranding(): Branding {
+  try {
+    const raw = localStorage.getItem(BRANDING_KEY);
+    return raw ? normBranding(JSON.parse(raw)) : EMPTY_BRANDING;
+  } catch {
+    return EMPTY_BRANDING;
+  }
+}
+
+function cacheBranding(b: Branding): void {
+  try {
+    localStorage.setItem(BRANDING_KEY, JSON.stringify(b));
+  } catch {}
+}
 
 function initialMode(): Mode {
   if (!isConfigured) return 'demo';
@@ -80,6 +111,7 @@ export function DataProvider({ children, now }: { children: ReactNode; now?: Dat
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [branding, setBranding] = useState<Branding>(EMPTY_BRANDING);
 
   // Modo demo: copia + cambios en memoria.
   const demoBase = useRef<BackupPayload | null>(null);
@@ -134,6 +166,53 @@ export function DataProvider({ children, now }: { children: ReactNode; now?: Dat
     void reload();
   }, [reload]);
 
+  // Marca del PDF: Supabase (portal_settings) con copia local de respaldo.
+  const userId = session?.user.id;
+  useEffect(() => {
+    if (mode === 'demo') {
+      setBranding(EMPTY_BRANDING);
+      return;
+    }
+    setBranding(readCachedBranding());
+    if (!supabase || !userId) return;
+    let alive = true;
+    void supabase
+      .from('portal_settings')
+      .select('branding')
+      .eq('user_id', userId)
+      .maybeSingle()
+      .then(({ data: row, error: err }) => {
+        if (!alive || err || !row) return;
+        const b = normBranding((row as { branding: unknown }).branding);
+        setBranding(b);
+        cacheBranding(b);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mode, userId]);
+
+  const saveBranding = useCallback<DataApi['saveBranding']>(
+    async (b) => {
+      const next = normBranding(b);
+      setBranding(next);
+      if (mode === 'demo') return;
+      cacheBranding(next);
+      if (!supabase || !userId) return;
+      const { error: err } = await supabase
+        .from('portal_settings')
+        .upsert({ user_id: userId, branding: next, updated_at: new Date().toISOString() });
+      if (err) {
+        throw new Error(
+          /portal_settings/.test(err.message)
+            ? 'Guardado solo en este navegador: falta ejecutar la migración "portal-meal-plans" en Supabase.'
+            : err.message
+        );
+      }
+    },
+    [mode, userId]
+  );
+
   const pushChange = useCallback(
     async (change: Omit<PortalChange, 'id' | 'created_at'>) => {
       if (mode === 'demo') {
@@ -179,6 +258,24 @@ export function DataProvider({ children, now }: { children: ReactNode; now?: Dat
     [pushChange]
   );
 
+  const saveMealPlan = useCallback<DataApi['saveMealPlan']>(
+    async (plan) => {
+      const id = plan.id ?? uuid();
+      const { id: _omit, ...rest } = plan;
+      void _omit;
+      const record: Record<string, unknown> = { name: rest.name.trim(), days: rest.days };
+      if (rest.client_id) record.client_id = rest.client_id;
+      await pushChange({ entity: 'meal_plan', op: 'upsert', record_id: id, record });
+      return id;
+    },
+    [pushChange]
+  );
+
+  const deleteMealPlan = useCallback<DataApi['deleteMealPlan']>(
+    (id) => pushChange({ entity: 'meal_plan', op: 'delete', record_id: id, record: null }),
+    [pushChange]
+  );
+
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error('Supabase no está configurado');
     const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -209,8 +306,8 @@ export function DataProvider({ children, now }: { children: ReactNode; now?: Dat
   }, []);
 
   const api = useMemo<DataApi>(
-    () => ({ mode, session, authReady, data, loading, error, reload, saveClient, saveMeasurement, deleteMeasurement, signIn, signOut, enterDemo, exitDemo }),
-    [mode, session, authReady, data, loading, error, reload, saveClient, saveMeasurement, deleteMeasurement, signIn, signOut, enterDemo, exitDemo]
+    () => ({ mode, session, authReady, data, loading, error, reload, saveClient, saveMeasurement, deleteMeasurement, saveMealPlan, deleteMealPlan, branding, saveBranding, signIn, signOut, enterDemo, exitDemo }),
+    [mode, session, authReady, data, loading, error, reload, saveClient, saveMeasurement, deleteMeasurement, saveMealPlan, deleteMealPlan, branding, saveBranding, signIn, signOut, enterDemo, exitDemo]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

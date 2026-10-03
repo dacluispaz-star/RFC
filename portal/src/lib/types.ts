@@ -88,11 +88,39 @@ export interface NutritionTargets {
   fat: number;
 }
 
+export interface MealPlanItem {
+  id: string;
+  food_id: string;
+  food_name: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface MealPlanMeal {
+  name: string;
+  items: MealPlanItem[];
+}
+
+export interface MealPlanDay {
+  name: string;
+  meals: MealPlanMeal[];
+}
+
+/** Mismo formato que la app (src/stores/nutritionStore.ts). */
 export interface MealPlan {
   id: string;
   name: string;
   client_id?: string;
-  days: { name: string; meals: { name: string; items: { calories: number; protein: number; carbs: number; fat: number }[] }[] }[];
+  days: MealPlanDay[];
+}
+
+/** Marca usada en el PDF (tabla `portal_settings`). */
+export interface Branding {
+  logoUrl: string | null;
+  contactInfo: string;
 }
 
 export interface CheckIn {
@@ -146,7 +174,7 @@ export interface BackupPayload {
 
 export interface PortalChange {
   id: string;
-  entity: 'client' | 'measurement';
+  entity: 'client' | 'measurement' | 'meal_plan';
   op: 'upsert' | 'delete';
   record_id: string;
   record: Record<string, unknown> | null;
